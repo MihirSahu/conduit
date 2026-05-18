@@ -1,3 +1,16 @@
+# @conduit-llm/provider-chatgpt
+
+ChatGPT subscription-backed Conduit provider with OAuth session storage and Codex backend transport.
+
+## Install
+
+```sh
+npm install @conduit-llm/provider-chatgpt
+```
+
+## Usage
+
+```ts
 import {
   ChatGPTProvider,
   ChatGPTSession,
@@ -14,3 +27,6 @@ const result = await llm.generateText({
 });
 
 console.log(result.text);
+```
+
+Use `@conduit-llm/cli` to create the ChatGPT OAuth session before using the provider in a local script.

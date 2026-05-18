@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { ConsoleSink, EventBus } from "@conduit/core";
+import { ConsoleSink, EventBus } from "@conduit-llm/core";
 import {
   ChatGPTProvider,
   ChatGPTSession,
@@ -7,13 +7,19 @@ import {
   KeyringTokenStorage,
   OAuthClient,
   createDefaultStorage,
-} from "@conduit/provider-chatgpt";
+} from "@conduit-llm/provider-chatgpt";
 
 interface CliContext {
   args: string[];
 }
 
-async function main(ctx: CliContext): Promise<void> {
+interface AskOptions {
+  stream: boolean;
+  prompt: string;
+  model?: string | undefined;
+}
+
+export async function main(ctx: CliContext): Promise<void> {
   const [command, ...rest] = ctx.args;
   switch (command) {
     case "login":
@@ -44,7 +50,18 @@ async function main(ctx: CliContext): Promise<void> {
 
 async function login(args: string[]): Promise<void> {
   const storage = await createDefaultStorage();
-  const oauth = new OAuthClient();
+  const oauth = new OAuthClient({
+    onDeviceCode: (session) => {
+      console.log("Open this link and sign in:");
+      console.log(session.verificationUrl);
+      console.log("");
+      console.log("Enter this one-time code:");
+      console.log(session.userCode);
+      console.log("");
+      console.log("This code expires in about 15 minutes.");
+      console.log("Waiting for authentication...");
+    },
+  });
   const tokens = isDeviceAuthRequested(args)
     ? await oauth.loginDeviceAuth()
     : await oauth.loginInteractive();
@@ -99,16 +116,15 @@ async function status(): Promise<void> {
 }
 
 async function ask(args: string[]): Promise<void> {
-  const stream = args.includes("--stream");
-  const prompt = args
-    .filter((arg) => arg !== "--stream")
-    .join(" ")
-    .trim();
+  const { stream, prompt, model } = parseAskArgs(args);
   if (!prompt) {
-    throw new Error("Usage: conduit ask [--stream] <prompt>");
+    throw new Error("Usage: conduit ask [--stream] [--model <model>] <prompt>");
   }
   const provider = await createChatGPTProvider();
-  const request = { messages: [{ role: "user" as const, content: prompt }] };
+  const request = {
+    messages: [{ role: "user" as const, content: prompt }],
+    ...(model ? { model } : {}),
+  };
   if (stream) {
     for await (const chunk of provider.streamText(request)) {
       if (chunk.type === "text-delta") {
@@ -120,6 +136,44 @@ async function ask(args: string[]): Promise<void> {
   }
   const result = await provider.generateText(request);
   console.log(result.text);
+}
+
+export function parseAskArgs(
+  args: string[],
+  env: Record<string, string | undefined> = process.env,
+): AskOptions {
+  const promptParts: string[] = [];
+  let stream = false;
+  let model: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) {
+      continue;
+    }
+    if (arg === "--stream") {
+      stream = true;
+      continue;
+    }
+    if (arg === "--model") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error(
+          "Usage: conduit ask [--stream] [--model <model>] <prompt>",
+        );
+      }
+      model = value;
+      index += 1;
+      continue;
+    }
+    promptParts.push(arg);
+  }
+  const envModel = env.CONDUIT_MODEL?.trim();
+  const resolvedModel = model ?? (envModel ? envModel : undefined);
+  return {
+    stream,
+    prompt: promptParts.join(" ").trim(),
+    ...(resolvedModel ? { model: resolvedModel } : {}),
+  };
 }
 
 async function doctor(): Promise<void> {
@@ -165,7 +219,7 @@ Commands:
   conduit login [--device-auth]
   conduit logout
   conduit status
-  conduit ask [--stream] <prompt>
+  conduit ask [--stream] [--model <model>] <prompt>
   conduit doctor
 
 Login options:
@@ -175,6 +229,7 @@ Login options:
 Environment:
   CONDUIT_STORAGE=file       Force file token storage
   CONDUIT_LOG_EVENTS=1       Emit redacted events to stdout
+  CONDUIT_MODEL=<model>      Default model for conduit ask
 `);
 }
 
@@ -182,7 +237,9 @@ function isDeviceAuthRequested(args: string[]): boolean {
   return args.includes("--device-auth") || args.includes("--device-code");
 }
 
-main({ args: process.argv.slice(2) }).catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+if (import.meta.main) {
+  main({ args: process.argv.slice(2) }).catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

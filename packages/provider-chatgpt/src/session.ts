@@ -1,7 +1,7 @@
-import { AuthExpiredError, EventBus } from "@conduit/core";
+import { AuthExpiredError, EventBus } from "@conduit-llm/core";
 import { OAuthClient } from "./oauth.js";
 import type { TokenStorage } from "./storage.js";
-import type { TokenSet } from "./tokens.js";
+import { type TokenSet, enrichTokenSet } from "./tokens.js";
 
 export interface SessionOptions {
   storage: TokenStorage;
@@ -50,8 +50,8 @@ export class ChatGPTSession {
     if (!tokens) {
       throw new AuthExpiredError("No ChatGPT tokens found. Run conduit login.");
     }
-    this.tokens = tokens;
-    return tokens;
+    this.tokens = enrichTokenSet(tokens);
+    return this.tokens;
   }
 
   private async refresh(): Promise<TokenSet> {

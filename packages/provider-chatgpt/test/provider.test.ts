@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AuthExpiredError,
   ProviderUnavailableError,
   RateLimitError,
   type TextChunk,
-} from "@conduit/core";
+} from "@conduit-llm/core";
 import { z } from "zod";
 import { ChatGPTProvider } from "../src/provider";
+import { type TokenSet, enrichTokenSet } from "../src/tokens";
 
 class TestProvider extends ChatGPTProvider {
   constructor(private readonly chunks: TextChunk[]) {
@@ -66,6 +68,7 @@ describe("ChatGPTProvider", () => {
     });
 
     expect(result).toEqual({ title: "Ship" });
+    expect(body?.model).toBe("gpt-5.4");
     expect(body?.text).toEqual({
       format: {
         type: "json_schema",
@@ -75,6 +78,78 @@ describe("ChatGPTProvider", () => {
       },
     });
     expect(body?.metadata).toEqual({ userVisible: true });
+  });
+
+  test("request model overrides provider default", async () => {
+    let body: Record<string, unknown> | undefined;
+    const provider = new ChatGPTProvider({
+      session: fakeSession(),
+      systemPrompt: "test",
+      model: "gpt-5.4-mini",
+      fetch: (async (_url: unknown, init: RequestInit | undefined) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return sseResponse(["[DONE]"]);
+      }) as unknown as typeof fetch,
+    });
+
+    const result = await provider.generateText({
+      model: "gpt-5.5",
+      messages: [{ role: "user", content: "hello" }],
+    });
+
+    expect(body?.model).toBe("gpt-5.5");
+    expect(result.model).toBe("gpt-5.5");
+  });
+
+  test("uses nested token metadata for ChatGPT account headers", async () => {
+    let headers: Headers | undefined;
+    const tokens = enrichTokenSet({
+      accessToken: "access",
+      refreshToken: "refresh",
+      expiresAt: Date.now() + 60_000,
+      idToken: fakeJwt({
+        "https://api.openai.com/auth": {
+          chatgpt_account_id: "account-from-token",
+          chatgpt_plan_type: "plus",
+        },
+      }),
+    });
+    const provider = new ChatGPTProvider({
+      session: fakeSession(tokens),
+      systemPrompt: "test",
+      fetch: (async (_url: unknown, init: RequestInit | undefined) => {
+        headers = new Headers(init?.headers);
+        return sseResponse(["[DONE]"]);
+      }) as unknown as typeof fetch,
+    });
+
+    await provider.generateText({
+      messages: [{ role: "user", content: "hello" }],
+    });
+
+    expect(headers?.get("chatgpt-account-id")).toBe("account-from-token");
+  });
+
+  test("fails locally when ChatGPT account metadata is missing", async () => {
+    const provider = new ChatGPTProvider({
+      session: fakeSession({ accountId: undefined }),
+      systemPrompt: "test",
+      fetch: (async () => sseResponse(["[DONE]"])) as unknown as typeof fetch,
+    });
+
+    let thrown: unknown;
+    try {
+      await Array.fromAsync(
+        provider.streamText({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AuthExpiredError);
+    expect((thrown as Error).message).toContain("account ID is missing");
   });
 
   test("streamText does not treat function argument deltas as text", async () => {
@@ -354,6 +429,103 @@ describe("ChatGPTProvider", () => {
     expect(status.reason).toContain("HTTP 503");
   });
 
+  test("400 responses include redacted backend response details", async () => {
+    const provider = new ChatGPTProvider({
+      session: fakeSession(),
+      systemPrompt: "test",
+      fetch: (async () =>
+        Response.json(
+          {
+            error: {
+              message: "invalid request body",
+              access_token: "secret-token",
+            },
+          },
+          { status: 400 },
+        )) as unknown as typeof fetch,
+    });
+
+    let thrown: unknown;
+    try {
+      await Array.fromAsync(
+        provider.streamText({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(ProviderUnavailableError);
+    expect((thrown as Error).message).toContain("HTTP 400");
+    expect((thrown as Error).message).toContain("invalid request body");
+    expect((thrown as Error).message).toContain("[REDACTED]");
+    expect((thrown as Error).message).not.toContain("secret-token");
+  });
+
+  test("non-JSON backend response details redact token-like text", async () => {
+    const provider = new ChatGPTProvider({
+      session: fakeSession(),
+      systemPrompt: "test",
+      fetch: (async () =>
+        new Response(
+          "invalid request access_token=secret-token api_key: key-secret",
+          { status: 400 },
+        )) as unknown as typeof fetch,
+    });
+
+    let thrown: unknown;
+    try {
+      await Array.fromAsync(
+        provider.streamText({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(ProviderUnavailableError);
+    expect((thrown as Error).message).toContain("HTTP 400");
+    expect((thrown as Error).message).toContain("access_token=[REDACTED]");
+    expect((thrown as Error).message).toContain("api_key: [REDACTED]");
+    expect((thrown as Error).message).not.toContain("secret-token");
+    expect((thrown as Error).message).not.toContain("key-secret");
+  });
+
+  test("unsupported model 400s include an actionable model diagnostic", async () => {
+    const provider = new ChatGPTProvider({
+      session: fakeSession(),
+      systemPrompt: "test",
+      fetch: (async () =>
+        Response.json(
+          {
+            detail:
+              "The 'gpt-5.1-codex' model is not supported when using Codex with a ChatGPT account.",
+          },
+          { status: 400 },
+        )) as unknown as typeof fetch,
+    });
+
+    let thrown: unknown;
+    try {
+      await Array.fromAsync(
+        provider.streamText({
+          model: "gpt-5.1-codex",
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(ProviderUnavailableError);
+    expect((thrown as Error).message).toContain(
+      'does not support model "gpt-5.1-codex"',
+    );
+    expect((thrown as Error).message).toContain("--model gpt-5.4");
+  });
+
   test("429 responses populate rate limit windows from headers", async () => {
     const provider = new ChatGPTProvider({
       session: fakeSession(),
@@ -420,12 +592,13 @@ describe("ChatGPTProvider", () => {
   });
 });
 
-function fakeSession() {
-  const tokens = {
+function fakeSession(overrides: Partial<TokenSet> = {}) {
+  const tokens: TokenSet = {
     accessToken: "access",
     refreshToken: "refresh",
     expiresAt: Date.now() + 60_000,
     accountId: "account",
+    ...overrides,
   };
   return {
     async getTokens() {
@@ -435,6 +608,12 @@ function fakeSession() {
       return tokens;
     },
   } as never;
+}
+
+function fakeJwt(payload: Record<string, unknown>): string {
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "none" })}.${encode(payload)}.signature`;
 }
 
 function sseResponse(

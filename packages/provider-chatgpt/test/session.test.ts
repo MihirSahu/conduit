@@ -26,6 +26,28 @@ class MemoryStorage implements TokenStorage {
 }
 
 describe("ChatGPTSession", () => {
+  test("loads token metadata from nested ChatGPT claims", async () => {
+    const storage = new MemoryStorage({
+      accessToken: "access",
+      refreshToken: "refresh",
+      expiresAt: Date.now() + 10 * 60_000,
+      idToken: fakeJwt({
+        "https://api.openai.com/auth": {
+          chatgpt_account_id: "account-123",
+          chatgpt_plan_type: "plus",
+        },
+      }),
+    });
+    const session = new ChatGPTSession({ storage });
+
+    const tokens = await session.getTokens();
+
+    expect(tokens).toMatchObject({
+      accountId: "account-123",
+      planTier: "plus",
+    });
+  });
+
   test("refresh preserves account metadata when refresh response omits it", async () => {
     const storage = new MemoryStorage({
       accessToken: "old-access",
@@ -60,3 +82,9 @@ describe("ChatGPTSession", () => {
     expect(storage.tokens?.accountId).toBe("account");
   });
 });
+
+function fakeJwt(payload: Record<string, unknown>): string {
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "none" })}.${encode(payload)}.signature`;
+}

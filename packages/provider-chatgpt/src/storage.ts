@@ -10,7 +10,7 @@ import {
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { TokenSet } from "./tokens.js";
+import { type TokenSet, enrichTokenSet } from "./tokens.js";
 
 export interface TokenStorage {
   readonly name: string;
@@ -60,7 +60,9 @@ export class FileTokenStorage implements TokenStorage {
         `Refusing to read token file with unsafe permissions: ${this.path}`,
       );
     }
-    return JSON.parse(await readFile(this.path, "utf8")) as TokenSet;
+    return enrichTokenSet(
+      JSON.parse(await readFile(this.path, "utf8")) as TokenSet,
+    );
   }
 
   async set(tokens: TokenSet): Promise<void> {
@@ -123,7 +125,7 @@ export class KeyringTokenStorage implements TokenStorage {
 
   async get(): Promise<TokenSet | undefined> {
     const value = await Promise.resolve(this.entry.getPassword());
-    return value ? (JSON.parse(value) as TokenSet) : undefined;
+    return value ? enrichTokenSet(JSON.parse(value) as TokenSet) : undefined;
   }
 
   async set(tokens: TokenSet): Promise<void> {

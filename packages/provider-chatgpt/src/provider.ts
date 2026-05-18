@@ -3,8 +3,9 @@ import {
   ProviderUnavailableError,
   RateLimitError,
   generateStructuredWithRepair,
+  redact,
   zodToStrictJsonSchema,
-} from "@conduit/core";
+} from "@conduit-llm/core";
 import type {
   GenerateTextRequest,
   GenerateTextResult,
@@ -13,7 +14,7 @@ import type {
   ProviderStatus,
   StructuredRequest,
   TextChunk,
-} from "@conduit/core";
+} from "@conduit-llm/core";
 import {
   CODEX_RESPONSES_URL,
   DEFAULT_CODEX_MODEL,
@@ -167,9 +168,10 @@ export class ChatGPTProvider implements LLMProvider {
     req: GenerateTextRequest,
     stream: boolean,
   ): Promise<Response> {
+    const model = req.model ?? this.model;
     const first = await this.send(req, stream);
     if (first.status !== 401) {
-      return handleResponse(first, this.name);
+      return await handleResponse(first, this.name, model);
     }
     await this.options.session.forceRefresh();
     const second = await this.send(req, stream);
@@ -179,7 +181,7 @@ export class ChatGPTProvider implements LLMProvider {
         { provider: this.name },
       );
     }
-    return handleResponse(second, this.name);
+    return await handleResponse(second, this.name, model);
   }
 
   private async send(
@@ -187,6 +189,13 @@ export class ChatGPTProvider implements LLMProvider {
     stream: boolean,
   ): Promise<Response> {
     const tokens = await this.options.session.getTokens();
+    const accountId = tokens.accountId?.trim();
+    if (!accountId) {
+      throw new AuthExpiredError(
+        "ChatGPT account ID is missing from OAuth tokens. Run conduit logout, then conduit login again.",
+        { provider: this.name },
+      );
+    }
     const systemPrompt = this.options.systemPrompt ?? (await getSystemPrompt());
     const instructions = req.systemAppendix
       ? `${systemPrompt}\n\n${req.systemAppendix}`
@@ -196,7 +205,7 @@ export class ChatGPTProvider implements LLMProvider {
       method: "POST",
       headers: {
         authorization: `Bearer ${tokens.accessToken}`,
-        "chatgpt-account-id": tokens.accountId ?? "",
+        "ChatGPT-Account-ID": accountId,
         "content-type": "application/json",
         accept: stream ? "text/event-stream" : "application/json",
         "openai-beta": OPENAI_BETA_HEADER,
@@ -311,7 +320,11 @@ function toResponsesInput(
   });
 }
 
-function handleResponse(response: Response, provider: string): Response {
+async function handleResponse(
+  response: Response,
+  provider: string,
+  model: string | undefined,
+): Promise<Response> {
   if (response.ok) {
     return response;
   }
@@ -328,13 +341,46 @@ function handleResponse(response: Response, provider: string): Response {
       provider,
     });
   }
+  const detail = await readFailureDetail(response);
+  const unsupportedModelMessage = getUnsupportedModelMessage(detail, model);
   throw new ProviderUnavailableError(
-    `Codex backend failed with HTTP ${response.status}.`,
+    unsupportedModelMessage ??
+      `Codex backend failed with HTTP ${response.status}${detail ? `: ${detail}` : ""}.`,
     {
       provider,
       retryable: response.status >= 500,
     },
   );
+}
+
+function getUnsupportedModelMessage(
+  detail: string | undefined,
+  model: string | undefined,
+): string | undefined {
+  if (!detail?.toLowerCase().includes("model is not supported")) {
+    return undefined;
+  }
+  const attempted = model ? ` "${model}"` : "";
+  return `Codex backend does not support model${attempted} with this ChatGPT account. Try --model gpt-5.4 or another current Codex model. Backend detail: ${detail}.`;
+}
+
+async function readFailureDetail(
+  response: Response,
+): Promise<string | undefined> {
+  const body = await response.text().catch(() => "");
+  if (!body.trim()) {
+    return undefined;
+  }
+  const redacted = redactResponseBody(body);
+  return redacted.length > 500 ? `${redacted.slice(0, 500)}...` : redacted;
+}
+
+function redactResponseBody(body: string): string {
+  try {
+    return JSON.stringify(redact(JSON.parse(body)));
+  } catch {
+    return String(redact(body));
+  }
 }
 
 function parseRateLimitWindows(

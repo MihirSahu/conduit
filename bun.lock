@@ -5,7 +5,7 @@
     "": {
       "name": "conduit-workspace",
       "dependencies": {
-        "@conduit/provider-chatgpt": "workspace:*",
+        "@conduit-llm/provider-chatgpt": "workspace:*",
       },
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
@@ -15,36 +15,36 @@
       },
     },
     "examples/node-script": {
-      "name": "@conduit/example-node-script",
+      "name": "@conduit-llm/example-node-script",
       "version": "0.1.0",
       "dependencies": {
-        "@conduit/provider-chatgpt": "workspace:*",
+        "@conduit-llm/provider-chatgpt": "workspace:*",
       },
     },
     "packages/cli": {
-      "name": "@conduit/cli",
-      "version": "0.1.0",
+      "name": "@conduit-llm/cli",
+      "version": "0.1.1",
       "bin": {
-        "conduit": "./src/index.ts",
+        "conduit": "./dist/index.js",
       },
       "dependencies": {
-        "@conduit/core": "workspace:*",
-        "@conduit/provider-chatgpt": "workspace:*",
+        "@conduit-llm/core": "^0.1.1",
+        "@conduit-llm/provider-chatgpt": "^0.1.1",
       },
     },
     "packages/core": {
-      "name": "@conduit/core",
-      "version": "0.1.0",
+      "name": "@conduit-llm/core",
+      "version": "0.1.1",
       "dependencies": {
         "zod": "^3.24.1",
         "zod-to-json-schema": "^3.24.1",
       },
     },
     "packages/provider-chatgpt": {
-      "name": "@conduit/provider-chatgpt",
-      "version": "0.1.0",
+      "name": "@conduit-llm/provider-chatgpt",
+      "version": "0.1.1",
       "dependencies": {
-        "@conduit/core": "workspace:*",
+        "@conduit-llm/core": "^0.1.1",
         "zod": "^3.24.1",
       },
       "optionalDependencies": {
@@ -71,13 +71,13 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@1.9.4", "", { "os": "win32", "cpu": "x64" }, "sha512-8Y5wMhVIPaWe6jw2H+KlEm4wP/f7EW3810ZLmDlrEEy5KvBsb9ECEfu/kMWD484ijfQ8+nIi0giMgu9g1UAuuA=="],
 
-    "@conduit/cli": ["@conduit/cli@workspace:packages/cli"],
+    "@conduit-llm/cli": ["@conduit-llm/cli@workspace:packages/cli"],
 
-    "@conduit/core": ["@conduit/core@workspace:packages/core"],
+    "@conduit-llm/core": ["@conduit-llm/core@workspace:packages/core"],
 
-    "@conduit/example-node-script": ["@conduit/example-node-script@workspace:examples/node-script"],
+    "@conduit-llm/example-node-script": ["@conduit-llm/example-node-script@workspace:examples/node-script"],
 
-    "@conduit/provider-chatgpt": ["@conduit/provider-chatgpt@workspace:packages/provider-chatgpt"],
+    "@conduit-llm/provider-chatgpt": ["@conduit-llm/provider-chatgpt@workspace:packages/provider-chatgpt"],
 
     "@napi-rs/keyring": ["@napi-rs/keyring@1.3.0", "", { "optionalDependencies": { "@napi-rs/keyring-darwin-arm64": "1.3.0", "@napi-rs/keyring-darwin-x64": "1.3.0", "@napi-rs/keyring-freebsd-x64": "1.3.0", "@napi-rs/keyring-linux-arm-gnueabihf": "1.3.0", "@napi-rs/keyring-linux-arm64-gnu": "1.3.0", "@napi-rs/keyring-linux-arm64-musl": "1.3.0", "@napi-rs/keyring-linux-riscv64-gnu": "1.3.0", "@napi-rs/keyring-linux-x64-gnu": "1.3.0", "@napi-rs/keyring-linux-x64-musl": "1.3.0", "@napi-rs/keyring-win32-arm64-msvc": "1.3.0", "@napi-rs/keyring-win32-ia32-msvc": "1.3.0", "@napi-rs/keyring-win32-x64-msvc": "1.3.0" } }, "sha512-WrOw/bcXm0f9qHkumlT1QlArXSTWqaY9sunsDpOk+yCCorCKMxvWT/a3xko4EYHVdeZoh00yI2TydXn6eyICDA=="],
 
