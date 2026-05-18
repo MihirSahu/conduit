@@ -1,0 +1,25 @@
+{
+  "name": "conduit-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "examples/*"],
+  "scripts": {
+    "build": "rm -rf packages/*/dist && tsc -p packages/core/tsconfig.build.json && tsc -p packages/provider-chatgpt/tsconfig.build.json && tsc -p packages/cli/tsconfig.build.json",
+    "check": "bun run typecheck && bun test",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "pretest": "bun run build",
+    "test": "bun test",
+    "typecheck": "bun run build && tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@conduit/provider-chatgpt": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "^1.2.0",
+    "@types/node": "^20.17.10",
+    "typescript": "^5.7.2"
+  }
+}

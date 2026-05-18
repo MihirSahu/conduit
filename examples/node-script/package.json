@@ -1,0 +1,9 @@
+{
+  "name": "@conduit/example-node-script",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@conduit/provider-chatgpt": "workspace:*"
+  }
+}
