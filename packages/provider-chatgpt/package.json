@@ -1,7 +1,8 @@
 {
-  "name": "@conduit/provider-chatgpt",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@conduit-llm/provider-chatgpt",
+  "version": "0.1.1",
+  "description": "ChatGPT subscription-backed Conduit provider with OAuth session storage and Codex backend transport.",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,11 +12,37 @@
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/MihirSahu/conduit.git",
+    "directory": "packages/provider-chatgpt"
+  },
+  "bugs": {
+    "url": "https://github.com/MihirSahu/conduit/issues"
+  },
+  "homepage": "https://github.com/MihirSahu/conduit#readme",
+  "keywords": ["conduit", "chatgpt", "codex", "llm", "oauth", "typescript"],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "bun run build",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@conduit/core": "workspace:*",
+    "@conduit-llm/core": "^0.1.1",
     "zod": "^3.24.1"
   },
   "optionalDependencies": {

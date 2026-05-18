@@ -17,4 +17,4 @@ export const CODEX_SYSTEM_PROMPT_URL =
 export const FALLBACK_CODEX_SYSTEM_PROMPT =
   "You are Codex, a coding agent running in a local developer environment. Follow the user's instructions precisely, preserve security boundaries, and avoid exposing secrets.";
 
-export const DEFAULT_CODEX_MODEL = "gpt-5.1-codex";
+export const DEFAULT_CODEX_MODEL = "gpt-5.4";

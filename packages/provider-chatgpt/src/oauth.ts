@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { URL } from "node:url";
-import { AuthExpiredError, ProviderUnavailableError } from "@conduit/core";
+import { AuthExpiredError, ProviderUnavailableError } from "@conduit-llm/core";
 import {
   CALLBACK_HOST,
   CALLBACK_PORT,
@@ -15,6 +15,14 @@ import { type TokenSet, enrichTokenSet } from "./tokens.js";
 export interface OAuthClientOptions {
   fetch?: typeof fetch;
   openBrowser?: (url: string) => Promise<void> | void;
+  onDeviceCode?: (session: DeviceAuthSession) => Promise<void> | void;
+}
+
+export interface DeviceAuthSession {
+  verificationUrl: string;
+  userCode: string;
+  intervalSeconds: number;
+  expiresInSeconds: number;
 }
 
 export class OAuthClient {
@@ -39,9 +47,23 @@ export class OAuthClient {
   }
 
   async loginDeviceAuth(): Promise<TokenSet> {
-    throw new ProviderUnavailableError(
-      "Device-code OAuth is not enabled until the public Codex auth flow is confirmed.",
-    );
+    const onDeviceCode = this.options.onDeviceCode;
+    if (!onDeviceCode) {
+      throw new ProviderUnavailableError(
+        "Device-code OAuth requires an onDeviceCode callback so the verification URL and user code can be shown before polling.",
+      );
+    }
+    const session = await this.createDeviceAuthSession();
+    await onDeviceCode({
+      verificationUrl: session.verificationUrl,
+      userCode: session.userCode,
+      intervalSeconds: session.intervalSeconds,
+      expiresInSeconds: session.expiresInSeconds,
+    });
+    const code = await this.pollDeviceAuth(session);
+    return this.exchangeCode(code.authorizationCode, code.verifier, {
+      redirectUri: getDeviceRedirectUri(),
+    });
   }
 
   async loginDeviceCode(): Promise<TokenSet> {
@@ -71,6 +93,7 @@ export class OAuthClient {
   private async exchangeCode(
     code: string,
     verifier: string,
+    options: { redirectUri?: string | undefined } = {},
   ): Promise<TokenSet> {
     const response = await this.fetchImpl(`${OAUTH_ISSUER}/oauth/token`, {
       method: "POST",
@@ -80,7 +103,7 @@ export class OAuthClient {
         code,
         code_verifier: verifier,
         grant_type: "authorization_code",
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: options.redirectUri ?? REDIRECT_URI,
       }),
     });
     if (!response.ok) {
@@ -89,6 +112,76 @@ export class OAuthClient {
       );
     }
     return parseTokenResponse(await response.json());
+  }
+
+  private async createDeviceAuthSession(): Promise<
+    DeviceAuthSession & { deviceAuthId: string }
+  > {
+    const response = await this.fetchImpl(
+      `${getDeviceAuthApiBase()}/usercode`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ client_id: OAUTH_CLIENT_ID }),
+      },
+    );
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new ProviderUnavailableError(
+          "Device-code OAuth is not enabled for this Codex auth server. Use conduit login instead.",
+        );
+      }
+      throw new ProviderUnavailableError(
+        `Device-code OAuth request failed with HTTP ${response.status}.`,
+      );
+    }
+    const parsed = parseDeviceAuthSessionResponse(await response.json());
+    if (!parsed) {
+      throw new ProviderUnavailableError(
+        "Device-code OAuth response did not include a device code.",
+      );
+    }
+    return {
+      verificationUrl: getDeviceVerificationUrl(),
+      userCode: parsed.userCode,
+      deviceAuthId: parsed.deviceAuthId,
+      intervalSeconds: parsed.intervalSeconds,
+      expiresInSeconds: 15 * 60,
+    };
+  }
+
+  private async pollDeviceAuth(
+    session: DeviceAuthSession & { deviceAuthId: string },
+  ): Promise<DeviceAuthCode> {
+    const startedAt = Date.now();
+    const maxWaitMs = session.expiresInSeconds * 1000;
+    while (Date.now() - startedAt < maxWaitMs) {
+      const response = await this.fetchImpl(`${getDeviceAuthApiBase()}/token`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          device_auth_id: session.deviceAuthId,
+          user_code: session.userCode,
+        }),
+      });
+      if (response.ok) {
+        const code = parseDeviceAuthCodeResponse(await response.json());
+        if (!code) {
+          throw new AuthExpiredError(
+            "Device-code OAuth response did not include an authorization code.",
+          );
+        }
+        return code;
+      }
+      if (response.status === 403 || response.status === 404) {
+        await sleep(session.intervalSeconds * 1000);
+        continue;
+      }
+      throw new AuthExpiredError(
+        `Device-code OAuth failed with HTTP ${response.status}.`,
+      );
+    }
+    throw new AuthExpiredError("Device-code OAuth timed out after 15 minutes.");
   }
 
   private async openBrowser(url: string): Promise<void> {
@@ -109,6 +202,17 @@ export interface AuthorizeUrlOptions {
   clientId?: string | undefined;
   redirectUri?: string | undefined;
   originator?: string | undefined;
+}
+
+interface DeviceAuthCode {
+  authorizationCode: string;
+  verifier: string;
+}
+
+interface ParsedDeviceAuthSession {
+  deviceAuthId: string;
+  userCode: string;
+  intervalSeconds: number;
 }
 
 export function buildAuthorizeUrl(options: AuthorizeUrlOptions): string {
@@ -242,6 +346,48 @@ function closeServer(server: ReturnType<typeof createServer>): void {
   }
 }
 
+function getDeviceAuthApiBase(): string {
+  return `${OAUTH_ISSUER}/api/accounts/deviceauth`;
+}
+
+function getDeviceVerificationUrl(): string {
+  return `${OAUTH_ISSUER}/codex/device`;
+}
+
+function getDeviceRedirectUri(): string {
+  return `${OAUTH_ISSUER}/deviceauth/callback`;
+}
+
+function parseDeviceAuthSessionResponse(
+  input: unknown,
+): ParsedDeviceAuthSession | undefined {
+  const body = input as Record<string, unknown>;
+  const deviceAuthId = stringField(body, "device_auth_id");
+  const userCode =
+    stringField(body, "user_code") ?? stringField(body, "usercode");
+  const intervalSeconds = numberLikeField(body, "interval") ?? 5;
+  if (!deviceAuthId || !userCode) {
+    return undefined;
+  }
+  return { deviceAuthId, userCode, intervalSeconds };
+}
+
+function parseDeviceAuthCodeResponse(
+  input: unknown,
+): DeviceAuthCode | undefined {
+  const body = input as Record<string, unknown>;
+  const authorizationCode = stringField(body, "authorization_code");
+  const verifier = stringField(body, "code_verifier");
+  if (!authorizationCode || !verifier) {
+    return undefined;
+  }
+  return { authorizationCode, verifier };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function parseTokenResponse(
   input: unknown,
   options: { refreshTokenFallback?: string | undefined } = {},
@@ -275,4 +421,19 @@ function stringField(
 ): string | undefined {
   const value = input[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function numberLikeField(
+  input: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = input[key];
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }

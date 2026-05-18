@@ -5,16 +5,19 @@
   "type": "module",
   "workspaces": ["packages/*", "examples/*"],
   "scripts": {
-    "build": "rm -rf packages/*/dist && tsc -p packages/core/tsconfig.build.json && tsc -p packages/provider-chatgpt/tsconfig.build.json && tsc -p packages/cli/tsconfig.build.json",
+    "clean": "rm -rf packages/*/dist .context/npm-smoke",
+    "build": "bun run clean && tsc -p packages/core/tsconfig.build.json && tsc -p packages/provider-chatgpt/tsconfig.build.json && tsc -p packages/cli/tsconfig.build.json",
     "check": "bun run typecheck && bun test",
     "format": "biome format --write .",
     "lint": "biome check .",
+    "pack:dry-run": "bun run build && (cd packages/core && npm pack --dry-run --json) && (cd packages/provider-chatgpt && npm pack --dry-run --json) && (cd packages/cli && npm pack --dry-run --json)",
     "pretest": "bun run build",
+    "publish:packages": "bun run check && bun run lint && (cd packages/core && npm publish --access public) && (cd packages/provider-chatgpt && npm publish --access public) && (cd packages/cli && npm publish --access public)",
     "test": "bun test",
     "typecheck": "bun run build && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@conduit/provider-chatgpt": "workspace:*"
+    "@conduit-llm/provider-chatgpt": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

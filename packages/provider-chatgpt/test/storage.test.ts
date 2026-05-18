@@ -52,4 +52,36 @@ describe("FileTokenStorage", () => {
       accessToken: "new-access",
     });
   });
+
+  test("enriches persisted token metadata on read", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "conduit-"));
+    const path = join(dir, "auth.json");
+    await writeFile(
+      path,
+      JSON.stringify({
+        accessToken: "access",
+        refreshToken: "refresh",
+        expiresAt: Date.now() + 1000,
+        idToken: fakeJwt({
+          "https://api.openai.com/auth": {
+            chatgpt_account_id: "account-123",
+            chatgpt_plan_type: "plus",
+          },
+        }),
+      }),
+      { mode: 0o600 },
+    );
+    const storage = new FileTokenStorage(path);
+
+    await expect(storage.get()).resolves.toMatchObject({
+      accountId: "account-123",
+      planTier: "plus",
+    });
+  });
 });
+
+function fakeJwt(payload: Record<string, unknown>): string {
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "none" })}.${encode(payload)}.signature`;
+}

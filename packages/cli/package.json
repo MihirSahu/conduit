@@ -1,7 +1,8 @@
 {
-  "name": "@conduit/cli",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@conduit-llm/cli",
+  "version": "0.1.1",
+  "description": "Bun-based Conduit CLI for ChatGPT subscription-backed Codex login, status, and prompts.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "conduit": "./dist/index.js"
@@ -14,11 +15,37 @@
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/MihirSahu/conduit.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/MihirSahu/conduit/issues"
+  },
+  "homepage": "https://github.com/MihirSahu/conduit#readme",
+  "keywords": ["conduit", "chatgpt", "codex", "cli", "oauth"],
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "bun run build",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@conduit/core": "workspace:*",
-    "@conduit/provider-chatgpt": "workspace:*"
+    "@conduit-llm/core": "^0.1.1",
+    "@conduit-llm/provider-chatgpt": "^0.1.1"
   }
 }

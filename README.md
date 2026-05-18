@@ -4,9 +4,9 @@ Conduit is a TypeScript workspace for calling the Codex backend with a developer
 
 ## Packages
 
-- `@conduit/core`: provider interface, structured output helpers, typed errors, events, and redaction.
-- `@conduit/provider-chatgpt`: OAuth/session/storage plus Codex backend transport.
-- `@conduit/cli`: `conduit login`, `status`, `ask`, `doctor`, and `logout`.
+- `@conduit-llm/core`: provider interface, structured output helpers, typed errors, events, and redaction.
+- `@conduit-llm/provider-chatgpt`: OAuth/session/storage plus Codex backend transport.
+- `@conduit-llm/cli`: `conduit login`, `status`, `ask`, `doctor`, and `logout`.
 
 The CLI uses Codex-compatible naming for headless authentication:
 
@@ -14,7 +14,7 @@ The CLI uses Codex-compatible naming for headless authentication:
 conduit login --device-auth
 ```
 
-`--device-code` is accepted as an alias. Device auth is currently guarded until the public Codex auth flow is confirmed; interactive `conduit login` is the implemented path.
+`--device-code` is accepted as an alias.
 
 ## Development
 
@@ -26,6 +26,18 @@ bun test
 
 No dev server is required for the default checks.
 
+## Publishing
+
+The root workspace stays private. Publishable packages are `@conduit-llm/core`, `@conduit-llm/provider-chatgpt`, and `@conduit-llm/cli`.
+
+```sh
+bun run pack:dry-run
+npm login
+bun run publish:packages
+```
+
+Packages publish publicly under the `@conduit-llm` scope in dependency order.
+
 ## Example
 
 ```ts
@@ -33,7 +45,7 @@ import {
   ChatGPTProvider,
   ChatGPTSession,
   createDefaultStorage,
-} from "@conduit/provider-chatgpt";
+} from "@conduit-llm/provider-chatgpt";
 
 const storage = await createDefaultStorage();
 const llm = new ChatGPTProvider({

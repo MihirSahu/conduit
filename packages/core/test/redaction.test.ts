@@ -7,6 +7,7 @@ describe("redact", () => {
       authorization: "Bearer abc.def.ghi",
       nested: {
         accessToken: "secret",
+        api_key: "api-secret",
         message: "use Bearer token-value here",
       },
     });
@@ -15,8 +16,19 @@ describe("redact", () => {
       authorization: "[REDACTED]",
       nested: {
         accessToken: "[REDACTED]",
+        api_key: "[REDACTED]",
         message: "use Bearer [REDACTED] here",
       },
     });
+  });
+
+  test("redacts token-like key value text in strings", () => {
+    const output = redact(
+      "failed access_token=secret-token refresh-token: refresh-secret api_key: key-secret secret=password-value password='quoted-secret' authorization: Bearer auth-secret",
+    );
+
+    expect(output).toBe(
+      "failed access_token=[REDACTED] refresh-token: [REDACTED] api_key: [REDACTED] secret=[REDACTED] password=[REDACTED] authorization: [REDACTED]",
+    );
   });
 });
