@@ -1,6 +1,6 @@
 {
   "name": "@conduit-llm/provider-chatgpt",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "ChatGPT subscription-backed Conduit provider with OAuth session storage and Codex backend transport.",
   "license": "MIT",
   "type": "module",
