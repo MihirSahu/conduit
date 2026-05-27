@@ -30,14 +30,27 @@ const ACCOUNT = "chatgpt-oauth";
 export async function createDefaultStorage(
   options: StorageOptions = {},
 ): Promise<TokenStorage> {
-  if (options.forceFile || process.env.CONDUIT_STORAGE === "file") {
+  if (options.forceFile) {
     return new FileTokenStorage(options.filePath);
   }
-  try {
-    return await KeyringTokenStorage.create();
-  } catch {
+
+  const storage = process.env.CONDUIT_STORAGE?.trim();
+  if (!storage || storage === "file") {
     return new FileTokenStorage(options.filePath);
   }
+  if (storage === "keyring") {
+    try {
+      return await KeyringTokenStorage.create();
+    } catch (error) {
+      throw new Error(
+        `CONDUIT_STORAGE=keyring requested keyring storage, but it is unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  throw new Error(
+    `Invalid CONDUIT_STORAGE value "${storage}". Expected "file" or "keyring".`,
+  );
 }
 
 export class FileTokenStorage implements TokenStorage {

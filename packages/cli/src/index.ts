@@ -227,7 +227,8 @@ Login options:
   --device-code             Alias for --device-auth
 
 Environment:
-  CONDUIT_STORAGE=file       Force file token storage
+  CONDUIT_STORAGE=file|keyring
+                             Token storage backend (default: file)
   CONDUIT_LOG_EVENTS=1       Emit redacted events to stdout
   CONDUIT_MODEL=<model>      Default model for conduit ask
 `);

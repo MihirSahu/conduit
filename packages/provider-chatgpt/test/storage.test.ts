@@ -1,8 +1,93 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { chmod, mkdtemp, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FileTokenStorage } from "../src/storage";
+import {
+  FileTokenStorage,
+  KeyringTokenStorage,
+  createDefaultStorage,
+  type TokenStorage,
+} from "../src/storage";
+
+const originalStorageEnv = process.env.CONDUIT_STORAGE;
+const originalCreateKeyringStorage = KeyringTokenStorage.create;
+
+afterEach(() => {
+  if (originalStorageEnv === undefined) {
+    delete process.env.CONDUIT_STORAGE;
+  } else {
+    process.env.CONDUIT_STORAGE = originalStorageEnv;
+  }
+  KeyringTokenStorage.create = originalCreateKeyringStorage;
+});
+
+describe("createDefaultStorage", () => {
+  test("uses file storage by default", async () => {
+    delete process.env.CONDUIT_STORAGE;
+
+    const storage = await createDefaultStorage();
+
+    expect(storage.name).toBe("file");
+    expect(storage).toBeInstanceOf(FileTokenStorage);
+  });
+
+  test("uses file storage when CONDUIT_STORAGE=file", async () => {
+    process.env.CONDUIT_STORAGE = "file";
+
+    const storage = await createDefaultStorage();
+
+    expect(storage.name).toBe("file");
+    expect(storage).toBeInstanceOf(FileTokenStorage);
+  });
+
+  test("uses keyring storage when CONDUIT_STORAGE=keyring", async () => {
+    process.env.CONDUIT_STORAGE = "keyring";
+    let calls = 0;
+    const keyringStorage: TokenStorage = {
+      name: "keyring",
+      get: async () => undefined,
+      set: async () => undefined,
+      clear: async () => undefined,
+    };
+    KeyringTokenStorage.create = async () => {
+      calls += 1;
+      return keyringStorage as unknown as KeyringTokenStorage;
+    };
+
+    const storage = await createDefaultStorage();
+
+    expect(calls).toBe(1);
+    expect(storage.name).toBe("keyring");
+  });
+
+  test("fails clearly when explicit keyring storage is unavailable", async () => {
+    process.env.CONDUIT_STORAGE = "keyring";
+    KeyringTokenStorage.create = async () => {
+      throw new Error("native keyring module missing");
+    };
+
+    await expect(createDefaultStorage()).rejects.toThrow(
+      "CONDUIT_STORAGE=keyring requested keyring storage, but it is unavailable: native keyring module missing",
+    );
+  });
+
+  test("rejects invalid CONDUIT_STORAGE values", async () => {
+    process.env.CONDUIT_STORAGE = "vault";
+
+    await expect(createDefaultStorage()).rejects.toThrow(
+      'Invalid CONDUIT_STORAGE value "vault". Expected "file" or "keyring".',
+    );
+  });
+
+  test("forceFile keeps using file storage when CONDUIT_STORAGE=keyring", async () => {
+    process.env.CONDUIT_STORAGE = "keyring";
+
+    const storage = await createDefaultStorage({ forceFile: true });
+
+    expect(storage.name).toBe("file");
+    expect(storage).toBeInstanceOf(FileTokenStorage);
+  });
+});
 
 describe("FileTokenStorage", () => {
   test("writes token files with 0600 permissions", async () => {

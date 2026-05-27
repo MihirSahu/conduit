@@ -30,3 +30,16 @@ console.log(result.text);
 ```
 
 Use `@conduit-llm/cli` to create the ChatGPT OAuth session before using the provider in a local script.
+
+By default, `createDefaultStorage()` stores OAuth tokens in
+`~/.config/conduit/auth.json` with private file permissions. To opt into system
+keyring storage instead, set `CONDUIT_STORAGE=keyring` when logging in and when
+running queries:
+
+```sh
+CONDUIT_STORAGE=keyring conduit login --device-auth
+CONDUIT_STORAGE=keyring conduit ask "Say hello"
+```
+
+`CONDUIT_STORAGE=file` is also accepted to select the default file storage
+explicitly.

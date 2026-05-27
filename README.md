@@ -16,6 +16,18 @@ conduit login --device-auth
 
 `--device-code` is accepted as an alias.
 
+By default, Conduit stores OAuth tokens in `~/.config/conduit/auth.json` with
+private file permissions. To opt into system keyring storage instead, set
+`CONDUIT_STORAGE=keyring` when logging in and when running queries:
+
+```sh
+CONDUIT_STORAGE=keyring conduit login --device-auth
+CONDUIT_STORAGE=keyring conduit ask "Say hello"
+```
+
+`CONDUIT_STORAGE=file` is also accepted to select the default file storage
+explicitly.
+
 ## Development
 
 ```sh
