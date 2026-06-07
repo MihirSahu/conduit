@@ -1,0 +1,6 @@
+.git
+.context
+node_modules
+packages/*/dist
+examples/*/dist
+.DS_Store

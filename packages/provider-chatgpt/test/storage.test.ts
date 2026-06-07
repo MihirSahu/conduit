@@ -5,8 +5,8 @@ import { join } from "node:path";
 import {
   FileTokenStorage,
   KeyringTokenStorage,
-  createDefaultStorage,
   type TokenStorage,
+  createDefaultStorage,
 } from "../src/storage";
 
 const originalStorageEnv = process.env.CONDUIT_STORAGE;
@@ -14,7 +14,7 @@ const originalCreateKeyringStorage = KeyringTokenStorage.create;
 
 afterEach(() => {
   if (originalStorageEnv === undefined) {
-    delete process.env.CONDUIT_STORAGE;
+    Reflect.deleteProperty(process.env, "CONDUIT_STORAGE");
   } else {
     process.env.CONDUIT_STORAGE = originalStorageEnv;
   }
@@ -23,7 +23,7 @@ afterEach(() => {
 
 describe("createDefaultStorage", () => {
   test("uses file storage by default", async () => {
-    delete process.env.CONDUIT_STORAGE;
+    Reflect.deleteProperty(process.env, "CONDUIT_STORAGE");
 
     const storage = await createDefaultStorage();
 

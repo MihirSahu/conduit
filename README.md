@@ -7,6 +7,7 @@ Conduit is a TypeScript workspace for calling the Codex backend with a developer
 - `@conduit-llm/core`: provider interface, structured output helpers, typed errors, events, and redaction.
 - `@conduit-llm/provider-chatgpt`: OAuth/session/storage plus Codex backend transport.
 - `@conduit-llm/cli`: `conduit login`, `status`, `ask`, `doctor`, and `logout`.
+- `@conduit-llm/server`: OpenAI-compatible HTTP server for Chat Completions.
 
 The CLI uses Codex-compatible naming for headless authentication:
 
@@ -40,7 +41,7 @@ No dev server is required for the default checks.
 
 ## Publishing
 
-The root workspace stays private. Publishable packages are `@conduit-llm/core`, `@conduit-llm/provider-chatgpt`, and `@conduit-llm/cli`.
+The root workspace stays private. Publishable packages are `@conduit-llm/core`, `@conduit-llm/provider-chatgpt`, `@conduit-llm/cli`, and `@conduit-llm/server`.
 
 ```sh
 bun run pack:dry-run

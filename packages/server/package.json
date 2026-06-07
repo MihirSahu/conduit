@@ -1,0 +1,53 @@
+{
+  "name": "@conduit-llm/server",
+  "version": "0.1.0",
+  "description": "OpenAI-compatible HTTP server for Conduit providers.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "conduit-server": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map",
+    "Dockerfile",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/MihirSahu/conduit.git",
+    "directory": "packages/server"
+  },
+  "bugs": {
+    "url": "https://github.com/MihirSahu/conduit/issues"
+  },
+  "homepage": "https://github.com/MihirSahu/conduit#readme",
+  "keywords": ["conduit", "chatgpt", "openai-compatible", "server", "fastify"],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "bun run build",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@conduit-llm/core": "^0.1.1",
+    "@conduit-llm/provider-chatgpt": "^0.1.2",
+    "fastify": "^5.6.2"
+  }
+}
