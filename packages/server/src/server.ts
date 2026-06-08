@@ -23,6 +23,7 @@ export interface CreateServerOptions {
   provider: LLMProvider;
   apiKey?: string | undefined;
   allowedOrigins?: string[] | undefined;
+  defaultModel?: string | undefined;
   logger?: boolean | undefined;
 }
 
@@ -71,7 +72,7 @@ export function createConduitServer(
     try {
       const body = validateChatCompletionsRequest(request.body);
       const providerRequest = toGenerateTextRequest(body);
-      const model = body.model ?? "conduit-default";
+      const model = getResponseModel(body.model, options.defaultModel);
       if (body.stream) {
         await streamChatCompletion(
           options.provider,
@@ -122,6 +123,16 @@ function applyCors(
     reply.header("access-control-allow-methods", "GET,POST,OPTIONS");
     reply.header("access-control-allow-headers", "authorization,content-type");
   }
+}
+
+function getResponseModel(
+  requestedModel: string | undefined,
+  defaultModel: string | undefined,
+): string {
+  if (!requestedModel || requestedModel === "conduit-default") {
+    return defaultModel ?? "conduit-default";
+  }
+  return requestedModel;
 }
 
 async function streamChatCompletion(

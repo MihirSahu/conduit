@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { FileTokenStorage, OAuthClient } from "@conduit-llm/provider-chatgpt";
+import {
+  DEFAULT_CODEX_MODEL,
+  FileTokenStorage,
+  OAuthClient,
+} from "@conduit-llm/provider-chatgpt";
 import { readServerConfig } from "./config.js";
 import { createServerProvider } from "./provider.js";
 import { createConduitServer } from "./server.js";
@@ -46,6 +50,7 @@ async function serve(env: Record<string, string | undefined> = process.env) {
     provider,
     apiKey: config.apiKey,
     allowedOrigins: config.allowedOrigins,
+    defaultModel: config.model ?? DEFAULT_CODEX_MODEL,
     logger: true,
   });
   await server.listen({ host: config.host, port: config.port });

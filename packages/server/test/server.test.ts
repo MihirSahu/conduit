@@ -174,6 +174,28 @@ describe("Conduit server", () => {
     expect(response.payload).toContain("data: [DONE]");
   });
 
+  test("streams the configured default model for conduit-default requests", async () => {
+    const server = createConduitServer({
+      provider: new MockProvider(),
+      apiKey: "secret",
+      defaultModel: "mock-default-model",
+    });
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      headers: { authorization: "Bearer secret" },
+      payload: {
+        stream: true,
+        model: "conduit-default",
+        messages: [{ role: "user", content: "Say hello" }],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.payload).toContain('"model":"mock-default-model"');
+  });
+
   test("returns JSON errors when streams fail before headers are sent", async () => {
     const server = createConduitServer({
       provider: new PreStreamErrorProvider(),
